@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Mobile Accordion</title>
+  <script src="https://unpkg.com/tone"></script>
+  <style>
+    body {
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background: #1a1a2e;
+      font-family: Arial, sans-serif;
+    }
+
+    .phone-container {
+      position: relative;
+      width: 90vw;
+      max-width: 500px;
+      aspect-ratio: 2 / 3;
+      background: #300030;
+      border: 2px solid #ffffff;
+      overflow: hidden;
+      border-radius: 20px;
+      box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+    }
+
+    .action-button {
+      width: 15%;
+      aspect-ratio: 1/1;
+      background: #ff33cc;
+      border-radius: 50%;
+      border: none;
+      position: absolute;
+      cursor: pointer;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3),
+                  inset 0 2px 4px rgba(255,255,255,0.5);
+      transition: transform 0.2s ease, background 0.2s ease;
+      touch-action: manipulation;
+    }
+
+    .action-button:active {
+      transform: scale(0.9);
+      background: #ff66dd;
+    }
+
+    .controls {
+      position: absolute;
+      bottom: 20px;
+      left: 0;
+      right: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 15px;
+      padding: 0 20px;
+    }
+
+    select {
+      padding: 10px 15px;
+      border-radius: 20px;
+      border: none;
+      background: #4a154b;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+      width: 100%;
+      max-width: 250px;
+    }
+
+    .title {
+      position: absolute;
+      top: 15px;
+      left: 0;
+      right: 0;
+      text-align: center;
+      color: white;
+      font-size: 20px;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    }
+
+    .instructions {
+      position: absolute;
+      bottom: 80px;
+      left: 0;
+      right: 0;
+      text-align: center;
+      color: #ccc;
+      font-size: 14px;
+      padding: 0 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="phone-container">
+    <div class="title">Mobile Accordion</div>
+    
+    <!-- Note buttons -->
+    <button class="action-button" style="left: 15%; top: 63%;" data-note="B4"></button>
+    <button class="action-button" style="left: 11%; top: 42%;" data-note="C5"></button>
+    <button class="action-button" style="left: 26%; top: 23%;" data-note="D5"></button>
+    <button class="action-button" style="left: 39%; top: 9%;"  data-note="E5"></button>
+    <button class="action-button" style="left: 56%; top: 62%;" data-note="B5"></button>
+    <button class="action-button" style="left: 44%; top: 45%;" data-note="C6"></button>
+    <button class="action-button" style="left: 58%; top: 31%;" data-note="D6"></button>
+    <button class="action-button" style="left: 76%; top: 14%;" data-note="E6"></button>
+    <button class="action-button" style="left: 69%; top: 83%;" data-note="B3"></button>
+    <button class="action-button" style="left: 42%; top: 83%;" data-note="C4"></button>
+    <button class="action-button" style="left: 14%; top: 83%;" data-note="D4"></button>
+    
+    <div class="instructions">Press and hold buttons for sustained notes</div>
+    
+    <div class="controls">
+      <select id="instrument-select">
+        <option value="accordion">Accordion</option>
+        <option value="triangle">Triangle</option>
+        <option value="sine">Sine</option>
+        <option value="sawtooth">Sawtooth</option>
+        <option value="square">Square</option>
+        <option value="pwm">Pulse Width</option>
+      </select>
+    </div>
+  </div>
+
+  <script>
+    // Initialize variables
+    let synth;
+    let currentInstrument = "accordion";
+    
+    // Create effects
+    const reverb = new Tone.Reverb({
+      decay: 2,
+      wet: 0.4
+    }).toDestination();
+    
+    const vibrato = new Tone.Vibrato({
+      frequency: 5,
+      depth: 0.1,
+      wet: 0.3
+    }).connect(reverb);
+    
+    // Function to create accordion instrument
+    function createAccordion() {
+      // Dispose of old synth if it exists
+      if (synth) synth.dispose();
+      
+      // Create a more complex synth for accordion sound
+      synth = new Tone.PolySynth(Tone.Synth, {
+        oscillator: {
+          type: "sawtooth"
+        },
+        envelope: {
+          attack: 0.01,
+          decay: 0.1,
+          sustain: 0.7,
+          release: 0.4
+        }
+      }).connect(vibrato);
+      
+      // Add a second oscillator for richer sound
+      const secondOsc = new Tone.Synth({
+        oscillator: {
+          type: "triangle"
+        },
+        envelope: {
+          attack: 0.02,
+          decay: 0.2,
+          sustain: 0.5,
+          release: 0.5
+        }
+      }).connect(vibrato);
+      
+      // When a note is played on the main synth, play it on the second oscillator too
+      synth.triggerAttack = function(note, time, velocity) {
+        Tone.Synth.prototype.triggerAttack.call(this, note, time, velocity);
+        secondOsc.triggerAttack(note, time, velocity);
+      };
+      
+      synth.triggerRelease = function(note, time) {
+        Tone.Synth.prototype.triggerRelease.call(this, note, time);
+        secondOsc.triggerRelease(note, time);
+      };
+    }
+    
+    // Function to create regular synth
+    function createSynth(type) {
+      // Dispose of old synth if it exists
+      if (synth) synth.dispose();
+      
+      synth = new Tone.Synth({
+        oscillator: { type: type },
+        envelope: {
+          attack: 0.01,
+          decay: 0.2,
+          sustain: 0.4,
+          release: 1
+        }
+      }).toDestination();
+    }
+    
+    // Function to change instrument type
+    function changeInstrument(type) {
+      currentInstrument = type;
+      
+      if (type === "accordion") {
+        createAccordion();
+      } else {
+        createSynth(type);
+      }
+    }
+    
+    // Initialize with accordion sound
+    createAccordion();
+    
+    // Set up instrument selection
+    const instrumentSelect = document.getElementById('instrument-select');
+    instrumentSelect.addEventListener('change', () => {
+      changeInstrument(instrumentSelect.value);
+    });
+    
+    // Attach press and release events to buttons
+    document.querySelectorAll(".action-button").forEach(button => {
+      const note = button.getAttribute("data-note");
+      
+      // Store whether this button is currently active
+      let isActive = false;
+
+      // Press down → start note
+      button.addEventListener("mousedown", async () => {
+        await Tone.start();
+        isActive = true;
+        if (currentInstrument === "accordion") {
+          synth.triggerAttack(note);
+        } else {
+          synth.triggerAttack(note);
+        }
+      });
+      
+      button.addEventListener("touchstart", async (e) => {
+        e.preventDefault();
+        await Tone.start();
+        isActive = true;
+        if (currentInstrument === "accordion") {
+          synth.triggerAttack(note);
+        } else {
+          synth.triggerAttack(note);
+        }
+      });
+
+      // Release → stop note
+      const releaseNote = () => {
+        if (isActive) {
+          isActive = false;
+          if (currentInstrument === "accordion") {
+            synth.triggerRelease(note);
+          } else {
+            synth.triggerRelease(note);
+          }
+        }
+      };
+      
+      button.addEventListener("mouseup", releaseNote);
+      button.addEventListener("mouseleave", releaseNote);
+      button.addEventListener("touchend", releaseNote);
+    });
+  </script>
+</body>
+</html>
