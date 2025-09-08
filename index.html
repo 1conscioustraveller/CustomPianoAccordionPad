@@ -14,6 +14,7 @@
       height: 100vh;
       background: #1a1a2e;
       font-family: Arial, sans-serif;
+      touch-action: manipulation;
     }
 
     .phone-container {
@@ -38,7 +39,7 @@
       cursor: pointer;
       box-shadow: 0 4px 8px rgba(0,0,0,0.3),
                   inset 0 2px 4px rgba(255,255,255,0.5);
-      transition: transform 0.2s ease, background 0.2s ease;
+      transition: transform 0.1s ease, background 0.1s ease;
       touch-action: manipulation;
     }
 
@@ -117,11 +118,11 @@
     <div class="controls">
       <select id="instrument-select">
         <option value="accordion">Accordion</option>
+        <option value="piano">Piano</option>
         <option value="triangle">Triangle</option>
         <option value="sine">Sine</option>
         <option value="sawtooth">Sawtooth</option>
         <option value="square">Square</option>
-        <option value="pwm">Pulse Width</option>
       </select>
     </div>
   </div>
@@ -133,57 +134,66 @@
     
     // Create effects
     const reverb = new Tone.Reverb({
-      decay: 2,
-      wet: 0.4
+      decay: 1.5,
+      wet: 0.3
     }).toDestination();
     
     const vibrato = new Tone.Vibrato({
       frequency: 5,
-      depth: 0.1,
-      wet: 0.3
+      depth: 0.2,
+      wet: 0.4
     }).connect(reverb);
+    
+    const chorus = new Tone.Chorus(4, 2.5, 0.5).connect(vibrato);
+    
+    // Start audio context on first user interaction
+    document.addEventListener('mousedown', initAudioContext);
+    document.addEventListener('touchstart', initAudioContext);
+    
+    let audioStarted = false;
+    function initAudioContext() {
+      if (!audioStarted) {
+        Tone.start();
+        audioStarted = true;
+        document.removeEventListener('mousedown', initAudioContext);
+        document.removeEventListener('touchstart', initAudioContext);
+      }
+    }
     
     // Function to create accordion instrument
     function createAccordion() {
       // Dispose of old synth if it exists
       if (synth) synth.dispose();
       
-      // Create a more complex synth for accordion sound
-      synth = new Tone.PolySynth(Tone.Synth, {
+      // Create a simpler synth for accordion sound
+      synth = new Tone.Synth({
         oscillator: {
           type: "sawtooth"
         },
         envelope: {
-          attack: 0.01,
+          attack: 0.001,
           decay: 0.1,
           sustain: 0.7,
-          release: 0.4
+          release: 0.3
         }
-      }).connect(vibrato);
+      }).connect(chorus);
+    }
+    
+    // Function to create piano instrument
+    function createPiano() {
+      if (synth) synth.dispose();
       
-      // Add a second oscillator for richer sound
-      const secondOsc = new Tone.Synth({
+      synth = new Tone.Synth({
         oscillator: {
-          type: "triangle"
+          type: "sawtooth"
         },
         envelope: {
-          attack: 0.02,
-          decay: 0.2,
-          sustain: 0.5,
-          release: 0.5
+          attack: 0.001,
+          decay: 0.3,
+          sustain: 0.1,
+          release: 0.2
         }
-      }).connect(vibrato);
-      
-      // When a note is played on the main synth, play it on the second oscillator too
-      synth.triggerAttack = function(note, time, velocity) {
-        Tone.Synth.prototype.triggerAttack.call(this, note, time, velocity);
-        secondOsc.triggerAttack(note, time, velocity);
-      };
-      
-      synth.triggerRelease = function(note, time) {
-        Tone.Synth.prototype.triggerRelease.call(this, note, time);
-        secondOsc.triggerRelease(note, time);
-      };
+      }).toDestination();
     }
     
     // Function to create regular synth
@@ -194,10 +204,10 @@
       synth = new Tone.Synth({
         oscillator: { type: type },
         envelope: {
-          attack: 0.01,
+          attack: 0.001,
           decay: 0.2,
           sustain: 0.4,
-          release: 1
+          release: 0.5
         }
       }).toDestination();
     }
@@ -208,6 +218,8 @@
       
       if (type === "accordion") {
         createAccordion();
+      } else if (type === "piano") {
+        createPiano();
       } else {
         createSynth(type);
       }
@@ -230,36 +242,27 @@
       let isActive = false;
 
       // Press down → start note
-      button.addEventListener("mousedown", async () => {
-        await Tone.start();
-        isActive = true;
-        if (currentInstrument === "accordion") {
-          synth.triggerAttack(note);
-        } else {
-          synth.triggerAttack(note);
+      const playNote = async () => {
+        if (!audioStarted) {
+          await Tone.start();
+          audioStarted = true;
         }
-      });
+        isActive = true;
+        synth.triggerAttack(note, Tone.immediate());
+      };
       
-      button.addEventListener("touchstart", async (e) => {
+      button.addEventListener("mousedown", playNote);
+      
+      button.addEventListener("touchstart", (e) => {
         e.preventDefault();
-        await Tone.start();
-        isActive = true;
-        if (currentInstrument === "accordion") {
-          synth.triggerAttack(note);
-        } else {
-          synth.triggerAttack(note);
-        }
+        playNote();
       });
 
       // Release → stop note
       const releaseNote = () => {
         if (isActive) {
           isActive = false;
-          if (currentInstrument === "accordion") {
-            synth.triggerRelease(note);
-          } else {
-            synth.triggerRelease(note);
-          }
+          synth.triggerRelease(Tone.immediate());
         }
       };
       
